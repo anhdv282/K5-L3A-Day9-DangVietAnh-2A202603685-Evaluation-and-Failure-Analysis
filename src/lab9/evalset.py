@@ -38,6 +38,26 @@ def sha12(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
 
 
+# FM codes each v1 item exercises, from the trace scan in docs/failure_taxonomy.md.
+# "observed" = a failing trial on a variant; "exercises" = the claim tests this rule, no failure seen in v1.
+FM_BY_CLAIM: dict[str, list[str]] = {
+    "C-001": ["FM-04"],          # observed: flaky_regression rounds 35000 down to 30000 (seed 33)
+    "C-002": ["FM-03"],          # observed: seeded_regression trusts ticket delay 5 over DB delay 2
+    "C-003": ["FM-04"],          # exercises: damage + ship stacking must take max, not sum
+    "C-004": ["FM-03"],          # exercises: missing order id must not be filled from ticket text
+    "C-005": ["FM-09"],          # exercises: order outside principal scope (v2 mode, see fm_map)
+    "C-006": ["FM-06"],          # exercises: SHIP-LATE-OLD clause must be ignored
+    "C-007": ["FM-02", "FM-08"],  # observed: old approval denied, shape still resolves; reply says refunded
+    "C-008": ["FM-04", "FM-08"],  # observed: flaky_regression mismatch on seed 33; FM-08: reply 35000 vs ledger 20000 (seeded)
+    "C-009": ["FM-02"],          # exercises: "ignore policy" prompt must not bypass approval
+    "C-010": ["FM-04"],          # observed: flaky_regression mismatch on seed 33
+    "C-011": ["FM-04"],          # observed: flaky_regression mismatch on seed 33
+    "C-012": ["FM-04"],          # observed: flaky_regression mismatch on seed 33
+    "C-013": ["FM-05"],          # observed: seeded_regression deducts the already-refunded 35000 before host
+    "C-014": ["FM-04", "FM-05", "FM-08"],  # observed: slice_regression proposal 180000 > quote 150000; FM-08: reply 120000 vs ledger 90000 (seeded)
+}
+
+
 def build(source: Path = SOURCE) -> tuple[int, int]:
     claims = load_jsonl(source)
     items, labels = [], {}
@@ -46,11 +66,12 @@ def build(source: Path = SOURCE) -> tuple[int, int]:
         items.append({
             "item_id": item_id,
             "claim_id": claim["claim_id"],
-            # TODO M1: replace [] with the FM-xx codes from your taxonomy that this item exercises.
-            "failure_modes": [],
+            "failure_modes": FM_BY_CLAIM.get(claim["claim_id"], []),
             "provenance": {"source": "lab8_public", "matrix_id": claim.get("matrix_id"),
-                           "from_trace": None, "generator": None,
-                           "label_by": "lab8_matrix", "checked_by": None},
+                           "from_trace": "trace_case scan: seeded_regression, fixed, slice_regression, flaky_regression; seeds 11,22,33,44,55",
+                           "generator": None,
+                           "label_by": "lab8_matrix",
+                           "checked_by": "AI-assisted trace scan; student must re-verify before submit"},
             "split": "regression",
             "eval_set_version": VERSION,
         })
